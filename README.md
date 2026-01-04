@@ -128,7 +128,7 @@ Los datos se agregan cuando OpenPOS sincroniza los productos. Para forzar la res
 
 ## Soporte
 
-Para soporte, contacta a [Latbit](https://latbit.com)
+Para soporte, contacta a [Sintexis](https://sintexis.cl)
 
 ## Licencia
 

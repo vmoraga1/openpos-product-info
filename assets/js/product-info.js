@@ -184,7 +184,7 @@
     };
  
     /*
-     * Inyectar información en el modal (guardada en casa de falla)
+     * Inyectar información en el modal 
      */
     function injectInfo(product) {
         // Remover info anterior

@@ -3,8 +3,8 @@
  * Plugin Name: OpenPOS Product Info
  * Description: Agrega información adicional del producto (descripción, etiquetas, etc.) al modal de producto en OpenPOS
  * Version: 1.1
- * Author: Latbit
- * Author URI: https://latbit.com
+ * Author: Víctor Moraga
+ * Author URI: https://sintexis.cl
  */
 
 // Evitar acceso directo

@@ -1,13 +1,13 @@
 /**
- * OpenPOS Product Info v1.3
+ * OpenPOS Product Info v1.2
  * Muestra información adicional del producto en OpenPOS
- * Soporta modales de productos simples y variables
+ * Fix: Ahora muestra el producto correcto al hacer clic en el carrito
  */
 
 (function() {
     'use strict';
     
-    console.log('[OPPI] v1.3 - Iniciando...');
+    console.log('[OPPI] v1.2 - Iniciando...');
     
     const config = window.oppiConfig || {
         maxDescriptionLength: 150,
@@ -65,16 +65,9 @@
     }
     
     /**
-     * Detectar si es modal de variaciones
-     */
-    function isVariationModal(modal) {
-        return modal.querySelector('app-options') !== null;
-    }
-    
-    /**
      * Crear HTML de información del producto
      */
-    function createInfoHTML(product, isCompact) {
+    function createInfoHTML(product) {
         if (!product) return '';
         
         let sections = [];
@@ -89,8 +82,8 @@
             `);
         }
         
-        // Descripción completa (si es diferente a la corta) - solo en modo no compacto
-        if (!isCompact && product.description && product.description !== product.short_description) {
+        // Descripción completa (si es diferente a la corta)
+        if (product.description && product.description !== product.short_description) {
             const desc = product.description;
             const isLong = desc.length > config.maxDescriptionLength;
             
@@ -139,8 +132,8 @@
             `);
         }
         
-        // Peso - solo en modo no compacto
-        if (!isCompact && product.weight_display) {
+        // Peso
+        if (product.weight_display) {
             sections.push(`
                 <div class="oppi-row">
                     <span class="oppi-lbl">PESO:</span>
@@ -149,8 +142,8 @@
             `);
         }
         
-        // Dimensiones - solo en modo no compacto
-        if (!isCompact && product.dimensions_display) {
+        // Dimensiones
+        if (product.dimensions_display) {
             sections.push(`
                 <div class="oppi-row">
                     <span class="oppi-lbl">DIMENSIONES:</span>
@@ -159,8 +152,8 @@
             `);
         }
         
-        // Atributos - solo en modo no compacto
-        if (!isCompact && product.product_attributes && product.product_attributes.length > 0) {
+        // Atributos
+        if (product.product_attributes && product.product_attributes.length > 0) {
             const attrs = product.product_attributes.map(a => 
                 `<div class="oppi-attr"><b>${a.name}:</b> ${a.value}</div>`
             ).join('');
@@ -186,10 +179,8 @@
             return '';
         }
         
-        const compactClass = isCompact ? 'oppi-compact' : '';
-        
         return `
-            <div id="oppi-box" class="oppi-box ${compactClass}">
+            <div id="oppi-box" class="oppi-box">
                 <div class="oppi-header">ℹ️ Información del Producto</div>
                 <div class="oppi-body">${sections.join('')}</div>
             </div>
@@ -218,7 +209,7 @@
     /**
      * Inyectar información en el modal
      */
-    function injectInfo(product, modal) {
+    function injectInfo(product) {
         const existing = document.getElementById('oppi-box');
         if (existing) {
             if (existing.dataset.productId == product.id && !product._fromDOM) {
@@ -228,74 +219,52 @@
         }
         
         if (!product) return;
-        if (!modal) modal = document.querySelector('.mat-dialog-container');
-        if (!modal) return;
         
-        const isVariation = isVariationModal(modal);
-        const html = createInfoHTML(product, isVariation);
+        const html = createInfoHTML(product);
         if (!html) return;
+        
+        const modal = document.querySelector('.mat-dialog-container');
+        if (!modal) return;
         
         const div = document.createElement('div');
         div.innerHTML = html;
         const infoBox = div.firstElementChild;
         
+        const insertTargets = [
+            '.item-price',
+            '.item-form',
+            '.item-main-container',
+            '.item-rows',
+            '.item-container',
+            '.mat-dialog-content'
+        ];
+        
         let inserted = false;
         
-        // Estrategia de inserción para modal de VARIACIONES
-        if (isVariation) {
-            // Opción 1: Después del título (.option-popup-title)
-            const popupTitle = modal.querySelector('.option-popup-title');
-            if (popupTitle && popupTitle.parentNode) {
-                popupTitle.parentNode.insertBefore(infoBox, popupTitle.nextSibling);
-                inserted = true;
-            }
-            
-            // Opción 2: Dentro de mat-dialog-content al principio
-            if (!inserted) {
-                const dialogContent = modal.querySelector('.mat-dialog-content');
-                if (dialogContent) {
-                    dialogContent.insertBefore(infoBox, dialogContent.firstChild);
-                    inserted = true;
-                }
-            }
-        }
-        
-        // Estrategia de inserción para modal SIMPLE (producto normal)
-        if (!inserted) {
-            const insertTargets = [
-                '.item-price',
-                '.item-form',
-                '.item-main-container',
-                '.item-rows',
-                '.item-container',
-                '.mat-dialog-content'
-            ];
-            
-            for (const selector of insertTargets) {
-                const target = modal.querySelector(selector);
-                if (target) {
-                    if (selector === '.item-price' && target.nextSibling) {
-                        target.parentNode.insertBefore(infoBox, target.nextSibling);
-                        inserted = true;
-                        break;
-                    }
-                    
-                    if (selector === '.item-form') {
-                        target.parentNode.insertBefore(infoBox, target);
-                        inserted = true;
-                        break;
-                    }
-                    
-                    if (selector === '.item-main-container' || selector === '.item-rows') {
-                        target.insertBefore(infoBox, target.firstChild);
-                        inserted = true;
-                        break;
-                    }
-                    
-                    target.appendChild(infoBox);
+        for (const selector of insertTargets) {
+            const target = modal.querySelector(selector);
+            if (target) {
+                if (selector === '.item-price' && target.nextSibling) {
+                    target.parentNode.insertBefore(infoBox, target.nextSibling);
                     inserted = true;
                     break;
                 }
+                
+                if (selector === '.item-form') {
+                    target.parentNode.insertBefore(infoBox, target);
+                    inserted = true;
+                    break;
+                }
+                
+                if (selector === '.item-main-container' || selector === '.item-rows') {
+                    target.insertBefore(infoBox, target.firstChild);
+                    inserted = true;
+                    break;
+                }
+                
+                target.appendChild(infoBox);
+                inserted = true;
+                break;
             }
         }
         
@@ -307,79 +276,22 @@
         if (inserted) {
             infoBox.dataset.productId = product.id || 0;
             lastShownProductId = product.id;
-            console.log('[OPPI] ✅ Info inyectada para:', product.name, isVariation ? '(variable)' : '(simple)');
+            console.log('[OPPI] ✅ Info inyectada para:', product.name);
         }
     }
-
+    
     /**
      * Extraer nombre del producto desde el modal
      */
-    function getProductNameFromModal(modal) {
-        if (!modal) modal = document.querySelector('.mat-dialog-container');
+    function getProductNameFromModal() {
+        const modal = document.querySelector('.mat-dialog-container');
         if (!modal) return null;
         
-        // Para modal de variación, buscar en .option-popup-title h1
-        const h1 = modal.querySelector('.option-popup-title h1');
-        if (h1) {
-            return h1.textContent.trim();
-        }
-        
-        // Para modal simple/carrito, buscar elementos específicos
-        // Primero intentar obtener el título sin el código
-        const titleEl = modal.querySelector('.item-title, .product-title, .product-name');
-        if (titleEl) {
-            // Clonar para no modificar el DOM
-            const clone = titleEl.cloneNode(true);
-            // Remover elementos hijos que contengan código/precio
-            clone.querySelectorAll('.item-code, .item-sku, .item-price, [class*="code"], [class*="sku"], [class*="price"]').forEach(el => el.remove());
-            
-            let text = clone.textContent.trim();
-            
-            // Si el texto termina con números (SKU pegado), removerlos
-            // Buscar patrón: texto seguido de números al final sin espacio
-            text = text.replace(/(\d{5,})$/, '').trim();
-            
-            // También limpiar "Código:" o "SKU:" si quedó
-            text = text.replace(/C[oó]digo:?\s*\d+/gi, '').trim();
-            text = text.replace(/SKU:?\s*\d+/gi, '').trim();
-            text = text.replace(/PRECIO:?\s*[\d.,]+/gi, '').trim();
-            
-            if (text) {
-                return text;
-            }
-        }
-        
-        // Fallback: otros selectores
-        const selectors = ['.mat-dialog-title', '.item-name', 'h1', 'h2'];
-        for (const selector of selectors) {
-            const el = modal.querySelector(selector);
-            if (el) {
-                let text = el.textContent.trim();
-                text = text.replace(/(\d{5,})$/, '').trim();
-                if (text && text.length > 0) {
-                    return text;
-                }
-            }
-        }
-        
-        return null;
-    }
-    
-    /*
-     * Extraer nombre del producto desde el modal
-     *
-    function getProductNameFromModal(modal) {
-        if (!modal) modal = document.querySelector('.mat-dialog-container');
-        if (!modal) return null;
-        
-        // Selectores para ambos tipos de modal
+        // Buscar el título del producto en el modal
         const selectors = [
-            '.option-popup-title h1',  // Modal variaciones
-            '.option-popup-title',      // Modal variaciones (fallback)
-            '.item-title',              // Modal simple
+            '.item-title',
             '.product-name',
             '.mat-dialog-title',
-            'h1',
             'h2',
             '.item-name'
         ];
@@ -395,112 +307,21 @@
         }
         
         return null;
-    }*/
+    }
 
     /**
      * Obtener producto actual - múltiples estrategias
      */
-    async function getProduct(modal) {
-        const modalProductName = getProductNameFromModal(modal);
-        const isVariation = isVariationModal(modal);
-
-        // DEBUG: Ver qué hay en cache
-        console.log('[OPPI] DEBUG - Nombre del modal:', modalProductName);
-        console.log('[OPPI] DEBUG - Nombres en cache:', Object.keys(window.__oppi_productCache || {}));
-        
-        // CASO 1: Modal de SELECCIÓN de variación → buscar producto PADRE
-        if (isVariation) {
-            if (modalProductName) {
-                const cached = findProductInCache(modalProductName);
-                if (cached && !cached.parent_id) {
-                    return cached;
-                }
-            }
-            if (modalProductName) {
-                const product = await searchProductInIndexedDB(modalProductName);
-                if (product) {
-                    window.__oppi_productCache[product.name] = product;
-                    return product;
-                }
-            }
-            return null;
-        }
-        
-        // CASO 2: Modal de item del CARRITO → buscar producto específico
-        
-        // PRIORIDAD 1: Buscar por nombre EXACTO del modal (más preciso)
-        if (modalProductName) {
-            // Búsqueda exacta primero
-            const exactMatch = window.__oppi_productCache[modalProductName];
-            if (exactMatch) {
-                console.log('[OPPI] Producto exacto desde modal:', exactMatch.name);
-                window.__oppi_clickedProductName = null;
-                return exactMatch;
-            }
-            
-            // Búsqueda normalizada exacta
-            const normalizedModal = normalizeName(modalProductName);
-            for (const [name, product] of Object.entries(window.__oppi_productCache)) {
-                if (normalizeName(name) === normalizedModal) {
-                    console.log('[OPPI] Producto normalizado desde modal:', product.name);
-                    window.__oppi_clickedProductName = null;
-                    return product;
-                }
-            }
-        }
-        
-        // PRIORIDAD 2: Nombre clickeado (fallback)
-        if (window.__oppi_clickedProductName) {
-            const cached = findProductInCache(window.__oppi_clickedProductName);
-            if (cached) {
-                console.log('[OPPI] Producto desde click:', cached.name);
-                window.__oppi_clickedProductName = null;
-                return cached;
-            }
-        }
-        
-        // PRIORIDAD 3: Último producto capturado (si coincide)
-        if (window.__oppi_lastProduct) {
-            if (modalProductName && normalizeName(window.__oppi_lastProduct.name) === normalizeName(modalProductName)) {
-                console.log('[OPPI] Producto desde lastProduct:', window.__oppi_lastProduct.name);
-                return window.__oppi_lastProduct;
-            }
-        }
-        
-        // PRIORIDAD 4: Buscar en IndexedDB
-        if (modalProductName) {
-            const product = await searchProductInIndexedDB(modalProductName);
-            if (product) {
-                window.__oppi_productCache[product.name] = product;
-                return product;
-            }
-        }
-        
-        // PRIORIDAD 5: Datos básicos del DOM
-        if (modalProductName) {
-            return { 
-                id: 0, 
-                name: modalProductName, 
-                _fromDOM: true 
-            };
-        }
-        
-        return null;
-    }
-
-    /*
-     * Obtener producto actual - múltiples estrategias
-     *
-    async function getProduct(modal) {
+    async function getProduct() {
         // Obtener nombre del modal actual
-        const modalProductName = getProductNameFromModal(modal);
+        const modalProductName = getProductNameFromModal();
         
         // Estrategia 1: Si tenemos un nombre clickeado, buscar por ese nombre
         if (window.__oppi_clickedProductName) {
             const cached = findProductInCache(window.__oppi_clickedProductName);
             if (cached) {
                 console.log('[OPPI] Producto desde click capturado:', cached.name);
-                window.__oppi_clickedProductName = null;
+                window.__oppi_clickedProductName = null; // Limpiar
                 return cached;
             }
         }
@@ -533,7 +354,7 @@
         }
         
         return null;
-    }*/
+    }
     
     /**
      * Manejar apertura de modal
@@ -544,110 +365,25 @@
         modal.dataset.oppiProcessed = 'true';
         
         // Esperar a que Angular renderice el contenido
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 300));
         
-        const product = await getProduct(modal);
+        const product = await getProduct();
         
         if (product) {
-            injectInfo(product, modal);
+            injectInfo(product);
         }
-    }
-
-    /**
-     * Obtener producto desde IndexedDB por ID
-     */
-    function getProductFromIndexedDB(productId) {
-        return new Promise((resolve) => {
-            try {
-                const request = indexedDB.open('newopDB');
-                
-                request.onerror = () => resolve(null);
-                
-                request.onsuccess = (event) => {
-                    const db = event.target.result;
-                    
-                    const storeName = db.objectStoreNames.contains('product_display') ? 'product_display' : 
-                                      db.objectStoreNames.contains('products') ? 'products' : null;
-                    
-                    if (!storeName) {
-                        resolve(null);
-                        return;
-                    }
-                    
-                    const tx = db.transaction(storeName, 'readonly');
-                    const store = tx.objectStore(storeName);
-                    const getReq = store.get(productId);
-                    
-                    getReq.onsuccess = () => resolve(getReq.result || null);
-                    getReq.onerror = () => resolve(null);
-                };
-            } catch (e) {
-                resolve(null);
-            }
-        });
-    }
-
-    /**
-     * Buscar producto en IndexedDB por nombre
-     */
-    function searchProductInIndexedDB(searchName) {
-        return new Promise((resolve) => {
-            try {
-                const request = indexedDB.open('newopDB');
-                
-                request.onerror = () => resolve(null);
-                
-                request.onsuccess = (event) => {
-                    const db = event.target.result;
-                    
-                    // El store correcto es 'product_display'
-                    const storeName = db.objectStoreNames.contains('product_display') ? 'product_display' : 
-                                      db.objectStoreNames.contains('products') ? 'products' : null;
-                    
-                    if (!storeName) {
-                        resolve(null);
-                        return;
-                    }
-                    
-                    const tx = db.transaction(storeName, 'readonly');
-                    const store = tx.objectStore(storeName);
-                    const cursorReq = store.openCursor();
-                    const normalizedSearch = normalizeName(searchName);
-                    
-                    cursorReq.onsuccess = (e) => {
-                        const cursor = e.target.result;
-                        if (cursor) {
-                            const product = cursor.value;
-                            if (product && product.name) {
-                                if (normalizeName(product.name) === normalizedSearch) {
-                                    console.log('[OPPI] ✅ Producto encontrado en IndexedDB:', product.name);
-                                    resolve(product);
-                                    return;
-                                }
-                            }
-                            cursor.continue();
-                        } else {
-                            resolve(null);
-                        }
-                    };
-                    
-                    cursorReq.onerror = () => resolve(null);
-                };
-            } catch (e) {
-                resolve(null);
-            }
-        });
     }
     
     /**
-     * Capturar clic en items del carrito y productos
+     * Capturar clic en items del carrito
      */
-    function setupClickCapture() {
-        document.addEventListener('click', async (e) => {
+    function setupCartClickCapture() {
+        document.addEventListener('click', (e) => {
             // Detectar clic en item del carrito
             const cartItem = e.target.closest('.cart-item, .cart-product, .cart-row, [class*="cart-item"], .item-row');
             
             if (cartItem) {
+                // Buscar el nombre del producto en el item del carrito
                 const nameSelectors = [
                     '.item-name',
                     '.product-name',
@@ -663,37 +399,9 @@
                         const name = nameEl.textContent.trim();
                         if (name && name.length > 2) {
                             window.__oppi_clickedProductName = name;
+                            console.log('[OPPI] Capturado clic en carrito:', name);
                             break;
                         }
-                    }
-                }
-            }
-            
-            // Detectar clic en producto del grid (para variables y simples)
-            const productItem = e.target.closest('.product-item, .product-card, [class*="product-grid"], .product');
-            if (productItem) {
-                // Intentar obtener el ID del producto
-                const productId = productItem.dataset.productId || 
-                                  productItem.dataset.id ||
-                                  productItem.getAttribute('data-product-id') ||
-                                  productItem.getAttribute('data-id');
-                
-                if (productId) {
-                    // Buscar en IndexedDB
-                    const product = await getProductFromIndexedDB(parseInt(productId));
-                    if (product) {
-                        window.__oppi_productCache[product.name] = product;
-                        window.__oppi_lastProduct = product;
-                        window.__oppi_clickedProductName = product.name;
-                    }
-                }
-                
-                // También capturar por nombre como fallback
-                const nameEl = productItem.querySelector('.product-name, .name, .title, .product-title');
-                if (nameEl) {
-                    const name = nameEl.textContent.trim();
-                    if (name && name.length > 2) {
-                        window.__oppi_clickedProductName = name;
                     }
                 }
             }
@@ -709,12 +417,14 @@
             try {
                 let cartData = null;
                 
+                // Si es FormData
                 if (body instanceof FormData) {
                     const cartValue = body.get('cart');
                     if (cartValue) {
                         cartData = JSON.parse(cartValue);
                     }
                 }
+                // Si es string con JSON
                 else if (typeof body === 'string' && body.includes('cart')) {
                     try {
                         const parsed = JSON.parse(body);
@@ -729,32 +439,29 @@
                 }
                 
                 if (cartData && cartData.items && cartData.items.length > 0) {
+                    // Guardar TODOS los productos del carrito en cache
                     cartData.items.forEach(item => {
                         if (item && item.product) {
-                            console.log('[OPPI] Guardando en cache:', item.product.name);
                             window.__oppi_productCache[item.product.name] = item.product;
-                            
-                            // Si es variación, guardar también el producto padre
-                            if (item.product.parent_product) {
-                                window.__oppi_productCache[item.product.parent_product.name] = item.product.parent_product;
-                            }
                         }
                     });
                     
+                    // Guardar el último como referencia rápida
                     const lastItem = cartData.items[cartData.items.length - 1];
                     if (lastItem && lastItem.product) {
                         window.__oppi_lastProduct = lastItem.product;
                         console.log('[OPPI] ✅ Cache actualizado con', cartData.items.length, 'productos');
                     }
                     
+                    // Reinyectar si hay modal abierto
                     setTimeout(function() {
                         const modal = document.querySelector('.mat-dialog-container');
                         if (modal && !document.getElementById('oppi-box')) {
-                            const modalName = getProductNameFromModal(modal);
+                            const modalName = getProductNameFromModal();
                             if (modalName) {
                                 const product = findProductInCache(modalName);
                                 if (product) {
-                                    injectInfo(product, modal);
+                                    injectInfo(product);
                                 }
                             }
                         }
@@ -776,16 +483,19 @@
             for (const mutation of mutations) {
                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
+                        // Detectar dialog directamente
                         if (node.classList && node.classList.contains('mat-dialog-container')) {
                             handleModal(node);
                         }
                         
+                        // Buscar dialog dentro del nodo agregado
                         if (node.querySelectorAll) {
                             node.querySelectorAll('.mat-dialog-container').forEach(dialog => {
                                 handleModal(dialog);
                             });
                         }
                         
+                        // Detectar overlay pane
                         if (node.classList && node.classList.contains('cdk-overlay-pane')) {
                             const dialog = node.querySelector('.mat-dialog-container');
                             if (dialog) handleModal(dialog);
@@ -823,34 +533,6 @@
                 max-height: 300px;
                 overflow-y: auto;
             }
-            
-            /* Modo compacto para modal de variaciones */
-            .oppi-box.oppi-compact {
-                margin: 8px 12px;
-                padding: 8px 10px;
-                max-height: 150px;
-                font-size: 12px;
-            }
-            .oppi-box.oppi-compact .oppi-header {
-                padding-bottom: 5px;
-                margin-bottom: 6px;
-                font-size: 11px;
-            }
-            .oppi-box.oppi-compact .oppi-body {
-                gap: 4px;
-            }
-            .oppi-box.oppi-compact .oppi-row {
-                gap: 5px;
-            }
-            .oppi-box.oppi-compact .oppi-lbl {
-                font-size: 9px;
-                min-width: 70px;
-            }
-            .oppi-box.oppi-compact .oppi-tag {
-                padding: 1px 6px;
-                font-size: 10px;
-            }
-            
             .oppi-header {
                 font-weight: 600;
                 color: #2d3748;
@@ -957,8 +639,9 @@
         injectStyles();
         setupObserver();
         setupXHRInterceptor();
-        setupClickCapture();
+        setupCartClickCapture();
         
+        // Verificar si ya hay un modal abierto
         const existingModal = document.querySelector('.mat-dialog-container');
         if (existingModal) {
             handleModal(existingModal);
@@ -967,12 +650,14 @@
         console.log('[OPPI] ✅ Inicialización completada');
     }
     
+    // Iniciar
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
     }
     
-    setTimeout(init, 1000);
+    // Re-iniciar después de un delay por si Angular carga después
+    setTimeout(init, 3000);
     
 })();

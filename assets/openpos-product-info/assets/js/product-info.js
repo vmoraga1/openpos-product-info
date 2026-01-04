@@ -310,64 +310,10 @@
             console.log('[OPPI] ✅ Info inyectada para:', product.name, isVariation ? '(variable)' : '(simple)');
         }
     }
-
+    
     /**
      * Extraer nombre del producto desde el modal
      */
-    function getProductNameFromModal(modal) {
-        if (!modal) modal = document.querySelector('.mat-dialog-container');
-        if (!modal) return null;
-        
-        // Para modal de variación, buscar en .option-popup-title h1
-        const h1 = modal.querySelector('.option-popup-title h1');
-        if (h1) {
-            return h1.textContent.trim();
-        }
-        
-        // Para modal simple/carrito, buscar elementos específicos
-        // Primero intentar obtener el título sin el código
-        const titleEl = modal.querySelector('.item-title, .product-title, .product-name');
-        if (titleEl) {
-            // Clonar para no modificar el DOM
-            const clone = titleEl.cloneNode(true);
-            // Remover elementos hijos que contengan código/precio
-            clone.querySelectorAll('.item-code, .item-sku, .item-price, [class*="code"], [class*="sku"], [class*="price"]').forEach(el => el.remove());
-            
-            let text = clone.textContent.trim();
-            
-            // Si el texto termina con números (SKU pegado), removerlos
-            // Buscar patrón: texto seguido de números al final sin espacio
-            text = text.replace(/(\d{5,})$/, '').trim();
-            
-            // También limpiar "Código:" o "SKU:" si quedó
-            text = text.replace(/C[oó]digo:?\s*\d+/gi, '').trim();
-            text = text.replace(/SKU:?\s*\d+/gi, '').trim();
-            text = text.replace(/PRECIO:?\s*[\d.,]+/gi, '').trim();
-            
-            if (text) {
-                return text;
-            }
-        }
-        
-        // Fallback: otros selectores
-        const selectors = ['.mat-dialog-title', '.item-name', 'h1', 'h2'];
-        for (const selector of selectors) {
-            const el = modal.querySelector(selector);
-            if (el) {
-                let text = el.textContent.trim();
-                text = text.replace(/(\d{5,})$/, '').trim();
-                if (text && text.length > 0) {
-                    return text;
-                }
-            }
-        }
-        
-        return null;
-    }
-    
-    /*
-     * Extraer nombre del producto desde el modal
-     *
     function getProductNameFromModal(modal) {
         if (!modal) modal = document.querySelector('.mat-dialog-container');
         if (!modal) return null;
@@ -395,102 +341,11 @@
         }
         
         return null;
-    }*/
+    }
 
     /**
      * Obtener producto actual - múltiples estrategias
      */
-    async function getProduct(modal) {
-        const modalProductName = getProductNameFromModal(modal);
-        const isVariation = isVariationModal(modal);
-
-        // DEBUG: Ver qué hay en cache
-        console.log('[OPPI] DEBUG - Nombre del modal:', modalProductName);
-        console.log('[OPPI] DEBUG - Nombres en cache:', Object.keys(window.__oppi_productCache || {}));
-        
-        // CASO 1: Modal de SELECCIÓN de variación → buscar producto PADRE
-        if (isVariation) {
-            if (modalProductName) {
-                const cached = findProductInCache(modalProductName);
-                if (cached && !cached.parent_id) {
-                    return cached;
-                }
-            }
-            if (modalProductName) {
-                const product = await searchProductInIndexedDB(modalProductName);
-                if (product) {
-                    window.__oppi_productCache[product.name] = product;
-                    return product;
-                }
-            }
-            return null;
-        }
-        
-        // CASO 2: Modal de item del CARRITO → buscar producto específico
-        
-        // PRIORIDAD 1: Buscar por nombre EXACTO del modal (más preciso)
-        if (modalProductName) {
-            // Búsqueda exacta primero
-            const exactMatch = window.__oppi_productCache[modalProductName];
-            if (exactMatch) {
-                console.log('[OPPI] Producto exacto desde modal:', exactMatch.name);
-                window.__oppi_clickedProductName = null;
-                return exactMatch;
-            }
-            
-            // Búsqueda normalizada exacta
-            const normalizedModal = normalizeName(modalProductName);
-            for (const [name, product] of Object.entries(window.__oppi_productCache)) {
-                if (normalizeName(name) === normalizedModal) {
-                    console.log('[OPPI] Producto normalizado desde modal:', product.name);
-                    window.__oppi_clickedProductName = null;
-                    return product;
-                }
-            }
-        }
-        
-        // PRIORIDAD 2: Nombre clickeado (fallback)
-        if (window.__oppi_clickedProductName) {
-            const cached = findProductInCache(window.__oppi_clickedProductName);
-            if (cached) {
-                console.log('[OPPI] Producto desde click:', cached.name);
-                window.__oppi_clickedProductName = null;
-                return cached;
-            }
-        }
-        
-        // PRIORIDAD 3: Último producto capturado (si coincide)
-        if (window.__oppi_lastProduct) {
-            if (modalProductName && normalizeName(window.__oppi_lastProduct.name) === normalizeName(modalProductName)) {
-                console.log('[OPPI] Producto desde lastProduct:', window.__oppi_lastProduct.name);
-                return window.__oppi_lastProduct;
-            }
-        }
-        
-        // PRIORIDAD 4: Buscar en IndexedDB
-        if (modalProductName) {
-            const product = await searchProductInIndexedDB(modalProductName);
-            if (product) {
-                window.__oppi_productCache[product.name] = product;
-                return product;
-            }
-        }
-        
-        // PRIORIDAD 5: Datos básicos del DOM
-        if (modalProductName) {
-            return { 
-                id: 0, 
-                name: modalProductName, 
-                _fromDOM: true 
-            };
-        }
-        
-        return null;
-    }
-
-    /*
-     * Obtener producto actual - múltiples estrategias
-     *
     async function getProduct(modal) {
         // Obtener nombre del modal actual
         const modalProductName = getProductNameFromModal(modal);
@@ -533,7 +388,7 @@
         }
         
         return null;
-    }*/
+    }
     
     /**
      * Manejar apertura de modal
@@ -544,7 +399,7 @@
         modal.dataset.oppiProcessed = 'true';
         
         // Esperar a que Angular renderice el contenido
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 300));
         
         const product = await getProduct(modal);
         
@@ -552,98 +407,12 @@
             injectInfo(product, modal);
         }
     }
-
-    /**
-     * Obtener producto desde IndexedDB por ID
-     */
-    function getProductFromIndexedDB(productId) {
-        return new Promise((resolve) => {
-            try {
-                const request = indexedDB.open('newopDB');
-                
-                request.onerror = () => resolve(null);
-                
-                request.onsuccess = (event) => {
-                    const db = event.target.result;
-                    
-                    const storeName = db.objectStoreNames.contains('product_display') ? 'product_display' : 
-                                      db.objectStoreNames.contains('products') ? 'products' : null;
-                    
-                    if (!storeName) {
-                        resolve(null);
-                        return;
-                    }
-                    
-                    const tx = db.transaction(storeName, 'readonly');
-                    const store = tx.objectStore(storeName);
-                    const getReq = store.get(productId);
-                    
-                    getReq.onsuccess = () => resolve(getReq.result || null);
-                    getReq.onerror = () => resolve(null);
-                };
-            } catch (e) {
-                resolve(null);
-            }
-        });
-    }
-
-    /**
-     * Buscar producto en IndexedDB por nombre
-     */
-    function searchProductInIndexedDB(searchName) {
-        return new Promise((resolve) => {
-            try {
-                const request = indexedDB.open('newopDB');
-                
-                request.onerror = () => resolve(null);
-                
-                request.onsuccess = (event) => {
-                    const db = event.target.result;
-                    
-                    // El store correcto es 'product_display'
-                    const storeName = db.objectStoreNames.contains('product_display') ? 'product_display' : 
-                                      db.objectStoreNames.contains('products') ? 'products' : null;
-                    
-                    if (!storeName) {
-                        resolve(null);
-                        return;
-                    }
-                    
-                    const tx = db.transaction(storeName, 'readonly');
-                    const store = tx.objectStore(storeName);
-                    const cursorReq = store.openCursor();
-                    const normalizedSearch = normalizeName(searchName);
-                    
-                    cursorReq.onsuccess = (e) => {
-                        const cursor = e.target.result;
-                        if (cursor) {
-                            const product = cursor.value;
-                            if (product && product.name) {
-                                if (normalizeName(product.name) === normalizedSearch) {
-                                    console.log('[OPPI] ✅ Producto encontrado en IndexedDB:', product.name);
-                                    resolve(product);
-                                    return;
-                                }
-                            }
-                            cursor.continue();
-                        } else {
-                            resolve(null);
-                        }
-                    };
-                    
-                    cursorReq.onerror = () => resolve(null);
-                };
-            } catch (e) {
-                resolve(null);
-            }
-        });
-    }
     
     /**
      * Capturar clic en items del carrito y productos
      */
     function setupClickCapture() {
-        document.addEventListener('click', async (e) => {
+        document.addEventListener('click', (e) => {
             // Detectar clic en item del carrito
             const cartItem = e.target.closest('.cart-item, .cart-product, .cart-row, [class*="cart-item"], .item-row');
             
@@ -663,37 +432,22 @@
                         const name = nameEl.textContent.trim();
                         if (name && name.length > 2) {
                             window.__oppi_clickedProductName = name;
+                            console.log('[OPPI] Capturado clic en carrito:', name);
                             break;
                         }
                     }
                 }
             }
             
-            // Detectar clic en producto del grid (para variables y simples)
-            const productItem = e.target.closest('.product-item, .product-card, [class*="product-grid"], .product');
+            // Detectar clic en producto del grid (para variables)
+            const productItem = e.target.closest('.product-item, .product-card, [class*="product-grid"]');
             if (productItem) {
-                // Intentar obtener el ID del producto
-                const productId = productItem.dataset.productId || 
-                                  productItem.dataset.id ||
-                                  productItem.getAttribute('data-product-id') ||
-                                  productItem.getAttribute('data-id');
-                
-                if (productId) {
-                    // Buscar en IndexedDB
-                    const product = await getProductFromIndexedDB(parseInt(productId));
-                    if (product) {
-                        window.__oppi_productCache[product.name] = product;
-                        window.__oppi_lastProduct = product;
-                        window.__oppi_clickedProductName = product.name;
-                    }
-                }
-                
-                // También capturar por nombre como fallback
-                const nameEl = productItem.querySelector('.product-name, .name, .title, .product-title');
+                const nameEl = productItem.querySelector('.product-name, .name, .title');
                 if (nameEl) {
                     const name = nameEl.textContent.trim();
                     if (name && name.length > 2) {
                         window.__oppi_clickedProductName = name;
+                        console.log('[OPPI] Capturado clic en producto:', name);
                     }
                 }
             }
@@ -731,12 +485,11 @@
                 if (cartData && cartData.items && cartData.items.length > 0) {
                     cartData.items.forEach(item => {
                         if (item && item.product) {
-                            console.log('[OPPI] Guardando en cache:', item.product.name);
                             window.__oppi_productCache[item.product.name] = item.product;
                             
-                            // Si es variación, guardar también el producto padre
-                            if (item.product.parent_product) {
-                                window.__oppi_productCache[item.product.parent_product.name] = item.product.parent_product;
+                            // También guardar por nombre del padre si es variación
+                            if (item.product.parent_product && item.product.parent_product.name) {
+                                window.__oppi_productCache[item.product.parent_product.name] = item.product;
                             }
                         }
                     });
@@ -973,6 +726,6 @@
         init();
     }
     
-    setTimeout(init, 1000);
+    setTimeout(init, 3000);
     
 })();

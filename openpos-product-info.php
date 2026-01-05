@@ -31,9 +31,13 @@ function oppi_get_options() {
         'show_attributes' => 'yes',
         'show_sku' => 'no',
         'show_stock' => 'no',
+        'show_price_rules' => 'yes',
+        'show_categories' => 'no',
+        'show_barcode' => 'no',
+        'show_vendor' => 'no',
         'max_description_length' => 150,
-        'info_position' => 'after_price', // after_price, before_buttons, custom
-        'custom_fields' => '', // Campo para meta keys personalizados separados por coma
+        'info_position' => 'after_price',
+        'custom_fields' => '',
     );
     
     $options = get_option('oppi_settings', array());
@@ -72,7 +76,8 @@ function oppi_sanitize_settings($input) {
     $checkboxes = array(
         'show_short_description', 'show_description', 'show_tags', 
         'show_brand', 'show_weight', 'show_dimensions', 'show_attributes',
-        'show_sku', 'show_stock'
+        'show_sku', 'show_stock', 'show_price_rules', 'show_categories',
+        'show_barcode', 'show_vendor'
     );
     
     foreach ($checkboxes as $key) {
@@ -184,6 +189,42 @@ function oppi_settings_page() {
                                 <label>
                                     <input type="checkbox" name="oppi_settings[show_stock]" value="yes" <?php checked($options['show_stock'], 'yes'); ?>>
                                     Mostrar cantidad en stock
+                                </label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Precios escalonados</th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="oppi_settings[show_price_rules]" value="yes" <?php checked($options['show_price_rules'], 'yes'); ?>>
+                                    Mostrar precios por cantidad (mayorista)
+                                </label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Categorías</th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="oppi_settings[show_categories]" value="yes" <?php checked($options['show_categories'], 'yes'); ?>>
+                                    Mostrar categorías del producto
+                                </label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Código de barras</th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="oppi_settings[show_barcode]" value="yes" <?php checked($options['show_barcode'], 'yes'); ?>>
+                                    Mostrar código de barras
+                                </label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Proveedor</th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="oppi_settings[show_vendor]" value="yes" <?php checked($options['show_vendor'], 'yes'); ?>>
+                                    Mostrar proveedor/vendor
                                 </label>
                             </td>
                         </tr>
@@ -333,6 +374,20 @@ if (!function_exists('oppi_add_product_data')) {
         }
         $product_data['tags'] = $tags;
         $product_data['tags_string'] = implode(', ', array_column($tags, 'name'));
+
+        // Categorías del producto
+        $categories = array();
+        $product_categories = wp_get_post_terms($parent_id ? $parent_id : $product_id, 'product_cat');
+        if (!is_wp_error($product_categories) && !empty($product_categories)) {
+            foreach ($product_categories as $cat) {
+                $categories[] = array(
+                    'id' => $cat->term_id,
+                    'name' => $cat->name,
+                    'slug' => $cat->slug
+                );
+            }
+        }
+        $product_data['categories'] = $categories;
         
         // Peso
         $weight = $_product->get_weight();
@@ -491,6 +546,30 @@ function oppi_register_scripts() {
         '1.1.' . time()
     );
     wp_enqueue_style('oppi-product-info-style');
+    
+    // Pasar configuración al JavaScript
+    $options = oppi_get_options();
+    
+    wp_localize_script('oppi-product-info', 'oppiConfig', array(
+        'showDescription' => $options['show_description'] === 'yes',
+        'showShortDescription' => $options['show_short_description'] === 'yes',
+        'showTags' => $options['show_tags'] === 'yes',
+        'showWeight' => $options['show_weight'] === 'yes',
+        'showDimensions' => $options['show_dimensions'] === 'yes',
+        'showAttributes' => $options['show_attributes'] === 'yes',
+        'showBrand' => $options['show_brand'] === 'yes',
+        'showSku' => $options['show_sku'] === 'yes',
+        'showStock' => $options['show_stock'] === 'yes',
+        'showPriceRules' => $options['show_price_rules'] === 'yes',
+        'showCategories' => $options['show_categories'] === 'yes',
+        'showBarcode' => $options['show_barcode'] === 'yes',
+        'showVendor' => $options['show_vendor'] === 'yes',
+        'maxDescriptionLength' => intval($options['max_description_length']),
+        'labels' => array(
+            'showMore' => 'Ver más',
+            'showLess' => 'Ver menos',
+        )
+    ));
 }
 add_action('init', 'oppi_register_scripts');
 
@@ -508,7 +587,7 @@ function oppi_add_to_pos_styles($handles) {
 }
 add_filter('openpos_pos_header_css', 'oppi_add_to_pos_styles');
 
-// Pasar configuración al JavaScript
+/*// Pasar configuración al JavaScript
 function oppi_localize_script() {
     $options = oppi_get_options();
     
@@ -520,14 +599,31 @@ function oppi_localize_script() {
         'showDimensions' => $options['show_dimensions'] === 'yes',
         'showAttributes' => $options['show_attributes'] === 'yes',
         'showBrand' => $options['show_brand'] === 'yes',
+        'showSku' => $options['show_sku'] === 'yes',
+        'showStock' => $options['show_stock'] === 'yes',
+        'showPriceRules' => $options['show_price_rules'] === 'yes',
+        'showCategories' => $options['show_categories'] === 'yes',
+        'showBarcode' => $options['show_barcode'] === 'yes',
+        'showVendor' => $options['show_vendor'] === 'yes',
         'maxDescriptionLength' => intval($options['max_description_length']),
         'labels' => array(
-            'showMore' => 'Ver más',
-            'showLess' => 'Ver menos',
+            'description' => __('Descripción', 'openpos-product-info'),
+            'shortDescription' => __('Descripción corta', 'openpos-product-info'),
+            'tags' => __('Etiquetas', 'openpos-product-info'),
+            'weight' => __('Peso', 'openpos-product-info'),
+            'dimensions' => __('Dimensiones', 'openpos-product-info'),
+            'attributes' => __('Atributos', 'openpos-product-info'),
+            'brand' => __('Marca', 'openpos-product-info'),
+            'priceRules' => __('Precios por cantidad', 'openpos-product-info'),
+            'categories' => __('Categorías', 'openpos-product-info'),
+            'barcode' => __('Código de barras', 'openpos-product-info'),
+            'vendor' => __('Proveedor', 'openpos-product-info'),
+            'showMore' => __('Ver más', 'openpos-product-info'),
+            'showLess' => __('Ver menos', 'openpos-product-info'),
         )
     ));
 }
-add_action('wp_enqueue_scripts', 'oppi_localize_script');
+add_action('wp_enqueue_scripts', 'oppi_localize_script');*/
 
 /**
  * Crear directorio de assets si no existe durante la activación

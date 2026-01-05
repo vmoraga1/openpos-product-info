@@ -9,13 +9,26 @@
     
     console.log('[OPPI] v1.3 - Iniciando...');
     
-    const config = window.oppiConfig || {
+    const config = Object.assign({
         maxDescriptionLength: 150,
+        showShortDescription: true,
+        showDescription: true,
+        showTags: true,
+        showBrand: true,
+        showWeight: true,
+        showDimensions: true,
+        showAttributes: true,
+        showSku: false,
+        showStock: false,
+        showPriceRules: true,
+        showCategories: false,
+        showBarcode: false,
+        showVendor: false,
         labels: {
             showMore: 'Ver más',
             showLess: 'Ver menos'
         }
-    };
+    }, window.oppiConfig || {});
     
     // Variables globales
     let lastShownProductId = null;
@@ -76,11 +89,14 @@
      */
     function createInfoHTML(product, isCompact) {
         if (!product) return '';
+        // DEBUG categorías
+        console.log('[OPPI] DEBUG - Categorías del producto:', product.categories);
+        console.log('[OPPI] DEBUG - Todos los campos del producto:', Object.keys(product));
         
         let sections = [];
         
         // Descripción corta
-        if (product.short_description) {
+        if (config.showShortDescription && product.short_description) {
             sections.push(`
                 <div class="oppi-row">
                     <span class="oppi-lbl">DESCRIPCIÓN:</span>
@@ -89,8 +105,8 @@
             `);
         }
         
-        // Descripción completa (si es diferente a la corta) - solo en modo no compacto
-        if (!isCompact && product.description && product.description !== product.short_description) {
+        // Descripción completa (si es diferente a la corta)
+        if (config.showDescription && product.description && product.description !== product.short_description) {
             const desc = product.description;
             const isLong = desc.length > config.maxDescriptionLength;
             
@@ -117,7 +133,7 @@
         }
         
         // Etiquetas
-        if (product.tags_string) {
+        if (config.showTags && product.tags_string) {
             const tags = product.tags_string.split(', ').map(t => 
                 `<span class="oppi-tag">${t}</span>`
             ).join('');
@@ -130,7 +146,7 @@
         }
         
         // Marca
-        if (product.brand) {
+        if (config.showBrand && product.brand) {
             sections.push(`
                 <div class="oppi-row">
                     <span class="oppi-lbl">MARCA:</span>
@@ -140,7 +156,7 @@
         }
         
         // Peso - solo en modo no compacto
-        if (!isCompact && product.weight_display) {
+        if (!isCompact && config.showWeight && product.weight_display) {
             sections.push(`
                 <div class="oppi-row">
                     <span class="oppi-lbl">PESO:</span>
@@ -150,7 +166,7 @@
         }
         
         // Dimensiones - solo en modo no compacto
-        if (!isCompact && product.dimensions_display) {
+        if (!isCompact && config.showDimensions && product.dimensions_display) {
             sections.push(`
                 <div class="oppi-row">
                     <span class="oppi-lbl">DIMENSIONES:</span>
@@ -160,7 +176,7 @@
         }
         
         // Atributos - solo en modo no compacto
-        if (!isCompact && product.product_attributes && product.product_attributes.length > 0) {
+        if (!isCompact && config.showAttributes && product.product_attributes && product.product_attributes.length > 0) {
             const attrs = product.product_attributes.map(a => 
                 `<div class="oppi-attr"><b>${a.name}:</b> ${a.value}</div>`
             ).join('');
@@ -173,7 +189,7 @@
         }
         
         // SKU
-        if (product.sku) {
+        if (config.showSku && product.sku) {
             sections.push(`
                 <div class="oppi-row">
                     <span class="oppi-lbl">SKU:</span>
@@ -184,6 +200,111 @@
         
         if (sections.length === 0) {
             return '';
+        }
+
+        // Precios escalonados
+        if (config.showPriceRules && product.price_rules && product.price_rules.length > 0) {
+            // Filtrar duplicados y ordenar por cantidad mínima
+            const uniqueRules = [];
+            const seen = new Set();
+            
+            product.price_rules.forEach(rule => {
+                const key = `${rule.min_qty}-${rule.price}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueRules.push(rule);
+                }
+            });
+            
+            // Ordenar por cantidad mínima
+            uniqueRules.sort((a, b) => (a.min_qty || 0) - (b.min_qty || 0));
+            
+            if (uniqueRules.length > 0) {
+                let rulesHtml = '<div class="oppi-price-rules">';
+                
+                uniqueRules.forEach((rule, index) => {
+                    const minQty = parseInt(rule.min_qty) || 0;
+                    const price = parseFloat(rule.price) || 0;
+                    
+                    // Determinar el rango
+                    let qtyLabel;
+                    if (index < uniqueRules.length - 1) {
+                        // No es el último tramo: mostrar rango "desde - hasta"
+                        const nextMinQty = parseInt(uniqueRules[index + 1].min_qty) || 0;
+                        const maxQty = nextMinQty - 1;
+                        qtyLabel = `${minQty}-${maxQty}`;
+                    } else {
+                        // Último tramo: mostrar "cantidad+"
+                        qtyLabel = `${minQty}+`;
+                    }
+                    
+                    rulesHtml += `<div class="oppi-price-rule">
+                        <span class="oppi-rule-qty">${qtyLabel} unid.</span>
+                        <span class="oppi-rule-price">$${price.toLocaleString('es-CL')}</span>
+                    </div>`;
+                });
+                
+                rulesHtml += '</div>';
+                
+                sections.push(`
+                    <div class="oppi-row">
+                        <span class="oppi-lbl">PRECIOS:</span>
+                        <span class="oppi-val">${rulesHtml}</span>
+                    </div>
+                `);
+            }
+        }
+        
+        // Categorías
+        if (config.showCategories && product.categories && product.categories.length > 0) {
+            let cats = '';
+            if (typeof product.categories[0] === 'object') {
+                cats = product.categories.map(c => c.name || c.title).join(', ');
+            } else {
+                cats = product.categories.join(', ');
+            }
+            sections.push(`
+                <div class="oppi-row">
+                    <span class="oppi-lbl">CATEGORÍAS:</span>
+                    <span class="oppi-val">${cats}</span>
+                </div>
+            `);
+        }
+        
+        // Código de barras
+        if (config.showBarcode && product.barcode) {
+            sections.push(`
+                <div class="oppi-row">
+                    <span class="oppi-lbl">CÓD. BARRAS:</span>
+                    <span class="oppi-val oppi-mono">${product.barcode}</span>
+                </div>
+            `);
+        }
+        
+        // Proveedor
+        if (config.showVendor && product.vendor) {
+            sections.push(`
+                <div class="oppi-row">
+                    <span class="oppi-lbl">PROVEEDOR:</span>
+                    <span class="oppi-val">${product.vendor}</span>
+                </div>
+            `);
+        }
+        
+        // Stock
+        if (config.showStock && (product.qty !== undefined || product.stock_status)) {
+            const stockQty = product.qty !== undefined ? product.qty : '';
+            const stockStatus = product.stock_status === 'instock' ? 'En stock' : 
+                                product.stock_status === 'outofstock' ? 'Agotado' : product.stock_status;
+            const stockDisplay = stockQty ? `${stockQty} unidades` : stockStatus;
+            const stockClass = product.stock_status === 'outofstock' ? 'oppi-stock-out' : 'oppi-stock-in';
+            
+            sections.push(`
+                <div class="oppi-row">
+                    <span class="oppi-lbl">STOCK:</span>
+                    <span class="oppi-val ${stockClass}">${stockDisplay}</span>
+                </div>
+            `);
         }
         
         const compactClass = isCompact ? 'oppi-compact' : '';
@@ -916,6 +1037,38 @@
             .oppi-attr {
                 font-size: 12px;
                 margin-bottom: 2px;
+            }
+            .oppi-price-rules {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+            .oppi-price-rule {
+                background: #fff3cd;
+                border: 1px solid #ffc107;
+                border-radius: 6px;
+                padding: 4px 8px;
+                font-size: 11px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            .oppi-rule-qty {
+                font-weight: 600;
+                color: #856404;
+                font-size: 10px;
+            }
+            .oppi-rule-price {
+                color: #155724;
+                font-weight: 700;
+            }
+            .oppi-stock-in {
+                color: #198754;
+                font-weight: 600;
+            }
+            .oppi-stock-out {
+                color: #dc3545;
+                font-weight: 600;
             }
             
             /* Dark mode */

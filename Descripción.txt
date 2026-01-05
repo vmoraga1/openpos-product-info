@@ -1,0 +1,48 @@
+🛒 OpenPOS Info Adicional de Productos v1.4
+Plugin para mostrar información detallada de productos en el punto de venta OpenPOS
+
+📋 Funcionalidades Principales
+Muestra Información del Producto (Seleccionable)
+
+Campos adicionales:
+- Descripción corta 
+- Descripción completa (con opción "Ver más" para textos largos)
+- Etiquetas del producto
+- Marca
+- Categorías
+- SKU
+- Código de barras
+- Peso 
+- Dimensiones
+- Atributos del producto
+- Stock disponible
+- Proveedor/Vendor
+- Precios Escalonados (Mayorista):
+	Muestra automáticamente los tramos de precios por cantidad
+	Formato claro: "50-99 unid. → $2.900" | "100+ unid. → $2.600"
+- Campos Personalizados:
+	Permite mostrar cualquier campo meta de WooCommerce
+	Configurable desde el panel de administración
+* Scroll automático cuando hay mucha información *
+
+⚙️ Panel de Administración
+Accesible desde WooCommerce → Info Adicional POS
+
+✅ Activar/desactivar cada campo individualmente
+✅ Configurar longitud máxima de descripciones
+✅ Agregar campos meta personalizados
+✅ Vista previa
+
+🎯 Compatibilidad
+✅ Productos simples
+✅ Productos variables (variaciones)
+✅ Múltiples productos en el carrito
+✅ Sincronización automática con datos de WooCommerce
+
+💡 Beneficio: 
+- Acceso rápido a toda la información del producto sin salir del POS
+- Menos errores
+- Visualización clara de precios por cantidad
+- Atención más rápida
+- No es necesario buscar información en panel de administración
+- Puede elegir qué campos mostrar

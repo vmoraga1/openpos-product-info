@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: OpenPOS Product Info
+ * Plugin Name: OpenPOS Info Products
  * Description: Agrega información adicional del producto (descripción, etiquetas, etc.) al modal de producto en OpenPOS
  * Version: 1.1
  * Author: Víctor Moraga
@@ -50,8 +50,8 @@ function oppi_get_options() {
 function oppi_admin_menu() {
     add_submenu_page(
         'woocommerce',
-        'OpenPOS Product Info',
-        'POS Product Info',
+        'OpenPOS Info Adicional',
+        'Info Adicional POS',
         'manage_options',
         'oppi-settings',
         'oppi_settings_page'
@@ -253,7 +253,14 @@ function oppi_settings_page() {
                 </div>
                 
                 <!-- Columna de preview -->
-                <div class="oppi-preview-column" style="width: 350px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div class="oppi-preview-column"
+                    style="width:350px;
+                            background:#fff;
+                            padding:20px;
+                            border-radius:8px;
+                            box-shadow:0 1px 3px rgba(0,0,0,0.1);
+                            display:flex;
+                            flex-direction:column;">
                     <h2 style="margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 10px;">
                         👁️ Vista previa
                     </h2>
@@ -295,6 +302,7 @@ function oppi_settings_page() {
                     <p style="margin-top: 15px; font-size: 12px; color: #6c757d;">
                         <strong>Nota:</strong> Los cambios se verán en el POS después de guardar y recargar la página del POS.
                     </p>
+                    <p style="margin-top: auto; text-align: center;">Integrado por <a href="https://sintexis.cl/">Sintexis.cl</a></p>
                 </div>
             </div>
             
@@ -484,13 +492,37 @@ if (!function_exists('oppi_add_product_data')) {
         // Fecha de modificación
         $product_data['date_modified'] = $_product->get_date_modified() ? $_product->get_date_modified()->format('Y-m-d H:i:s') : '';
         
-        // Meta personalizados adicionales (configurable)
-        $custom_metas = apply_filters('oppi_custom_meta_keys', array(
-            // Agrega aquí los meta keys personalizados que quieras mostrar
-            // 'mi_meta_key' => 'Etiqueta para mostrar'
-        ));
-        
+        // Meta personalizados adicionales (desde configuración del plugin)
+        $options = oppi_get_options();
+        $custom_fields_string = $options['custom_fields'];
         $custom_data = array();
+        
+        if (!empty($custom_fields_string)) {
+            $custom_keys = array_map('trim', explode(',', $custom_fields_string));
+            
+            foreach ($custom_keys as $meta_key) {
+                if (empty($meta_key)) continue;
+                
+                $meta_value = get_post_meta($product_id, $meta_key, true);
+                if (empty($meta_value) && $parent_id) {
+                    $meta_value = get_post_meta($parent_id, $meta_key, true);
+                }
+                
+                if (!empty($meta_value)) {
+                    // Crear etiqueta legible desde el meta key
+                    $label = str_replace(array('_', '-'), ' ', ltrim($meta_key, '_'));
+                    $label = ucwords($label);
+                    
+                    $custom_data[$meta_key] = array(
+                        'label' => $label,
+                        'value' => $meta_value
+                    );
+                }
+            }
+        }
+        
+        // Permitir agregar más metas via filtro
+        $custom_metas = apply_filters('oppi_custom_meta_keys', array());
         foreach ($custom_metas as $meta_key => $label) {
             $meta_value = get_post_meta($product_id, $meta_key, true);
             if (empty($meta_value) && $parent_id) {
@@ -503,6 +535,7 @@ if (!function_exists('oppi_add_product_data')) {
                 );
             }
         }
+        
         $product_data['custom_meta'] = $custom_data;
         
         // Unidad de medida (si usas algún plugin de unidades)
@@ -587,44 +620,6 @@ function oppi_add_to_pos_styles($handles) {
 }
 add_filter('openpos_pos_header_css', 'oppi_add_to_pos_styles');
 
-/*// Pasar configuración al JavaScript
-function oppi_localize_script() {
-    $options = oppi_get_options();
-    
-    wp_localize_script('oppi-product-info', 'oppiConfig', array(
-        'showDescription' => $options['show_description'] === 'yes',
-        'showShortDescription' => $options['show_short_description'] === 'yes',
-        'showTags' => $options['show_tags'] === 'yes',
-        'showWeight' => $options['show_weight'] === 'yes',
-        'showDimensions' => $options['show_dimensions'] === 'yes',
-        'showAttributes' => $options['show_attributes'] === 'yes',
-        'showBrand' => $options['show_brand'] === 'yes',
-        'showSku' => $options['show_sku'] === 'yes',
-        'showStock' => $options['show_stock'] === 'yes',
-        'showPriceRules' => $options['show_price_rules'] === 'yes',
-        'showCategories' => $options['show_categories'] === 'yes',
-        'showBarcode' => $options['show_barcode'] === 'yes',
-        'showVendor' => $options['show_vendor'] === 'yes',
-        'maxDescriptionLength' => intval($options['max_description_length']),
-        'labels' => array(
-            'description' => __('Descripción', 'openpos-product-info'),
-            'shortDescription' => __('Descripción corta', 'openpos-product-info'),
-            'tags' => __('Etiquetas', 'openpos-product-info'),
-            'weight' => __('Peso', 'openpos-product-info'),
-            'dimensions' => __('Dimensiones', 'openpos-product-info'),
-            'attributes' => __('Atributos', 'openpos-product-info'),
-            'brand' => __('Marca', 'openpos-product-info'),
-            'priceRules' => __('Precios por cantidad', 'openpos-product-info'),
-            'categories' => __('Categorías', 'openpos-product-info'),
-            'barcode' => __('Código de barras', 'openpos-product-info'),
-            'vendor' => __('Proveedor', 'openpos-product-info'),
-            'showMore' => __('Ver más', 'openpos-product-info'),
-            'showLess' => __('Ver menos', 'openpos-product-info'),
-        )
-    ));
-}
-add_action('wp_enqueue_scripts', 'oppi_localize_script');*/
-
 /**
  * Crear directorio de assets si no existe durante la activación
  */
@@ -673,3 +668,13 @@ add_action('rest_api_init', function() {
         'permission_callback' => '__return_true'
     ));
 });
+
+/**
+ * Agregar enlace de configuración en la página de plugins
+ */
+function oppi_plugin_action_links($links) {
+    $settings_link = '<a href="' . admin_url('admin.php?page=oppi-settings') . '">Configuración</a>';
+    array_unshift($links, $settings_link);
+    return $links;
+}
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'oppi_plugin_action_links');

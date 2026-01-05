@@ -89,9 +89,8 @@
      */
     function createInfoHTML(product, isCompact) {
         if (!product) return '';
-        // DEBUG categorías
-        console.log('[OPPI] DEBUG - Categorías del producto:', product.categories);
-        console.log('[OPPI] DEBUG - Todos los campos del producto:', Object.keys(product));
+        // DEBUG campos disponibles del producto
+        //console.log('[OPPI] DEBUG - Todos los campos del producto:', Object.keys(product));
         
         let sections = [];
         
@@ -165,8 +164,14 @@
             `);
         }
         
-        // Dimensiones - solo en modo no compacto
-        if (!isCompact && config.showDimensions && product.dimensions_display) {
+        // Dimensiones - solo en modo no compacto (verificar que tenga valores reales)
+        const hasDimensions = product.dimensions_display && 
+                              product.dimensions_display.trim() !== '' &&
+                              product.dimensions_display !== 'N/D' &&
+                              product.dimensions_display !== 'N/A' &&
+                              !/^[\s×x]+$/.test(product.dimensions_display);
+        
+        if (!isCompact && config.showDimensions && hasDimensions) {
             sections.push(`
                 <div class="oppi-row">
                     <span class="oppi-lbl">DIMENSIONES:</span>
@@ -196,10 +201,6 @@
                     <span class="oppi-val oppi-mono">${product.sku}</span>
                 </div>
             `);
-        }
-        
-        if (sections.length === 0) {
-            return '';
         }
 
         // Precios escalonados
@@ -305,6 +306,26 @@
                     <span class="oppi-val ${stockClass}">${stockDisplay}</span>
                 </div>
             `);
+        }
+
+        // Campos personalizados
+        if (product.custom_meta && Object.keys(product.custom_meta).length > 0) {
+            for (const [key, meta] of Object.entries(product.custom_meta)) {
+                if (meta && meta.value) {
+                    const label = meta.label || key.replace(/_/g, ' ').toUpperCase();
+                    sections.push(`
+                        <div class="oppi-row">
+                            <span class="oppi-lbl">${label.toUpperCase()}:</span>
+                            <span class="oppi-val">${meta.value}</span>
+                        </div>
+                    `);
+                }
+            }
+        }
+
+        // Si no hay ninguna sección, no mostrar nada
+        if (sections.length === 0) {
+            return '';
         }
         
         const compactClass = isCompact ? 'oppi-compact' : '';
@@ -428,7 +449,6 @@
         if (inserted) {
             infoBox.dataset.productId = product.id || 0;
             lastShownProductId = product.id;
-            console.log('[OPPI] ✅ Info inyectada para:', product.name, isVariation ? '(variable)' : '(simple)');
         }
     }
 
@@ -526,8 +546,8 @@
         const isVariation = isVariationModal(modal);
 
         // DEBUG: Ver qué hay en cache
-        console.log('[OPPI] DEBUG - Nombre del modal:', modalProductName);
-        console.log('[OPPI] DEBUG - Nombres en cache:', Object.keys(window.__oppi_productCache || {}));
+        //console.log('[OPPI] DEBUG - Nombre del modal:', modalProductName);
+        //console.log('[OPPI] DEBUG - Nombres en cache:', Object.keys(window.__oppi_productCache || {}));
         
         // CASO 1: Modal de SELECCIÓN de variación → buscar producto PADRE
         if (isVariation) {
@@ -554,7 +574,7 @@
             // Búsqueda exacta primero
             const exactMatch = window.__oppi_productCache[modalProductName];
             if (exactMatch) {
-                console.log('[OPPI] Producto exacto desde modal:', exactMatch.name);
+                //console.log('[OPPI] Producto exacto desde modal:', exactMatch.name);
                 window.__oppi_clickedProductName = null;
                 return exactMatch;
             }
@@ -563,7 +583,6 @@
             const normalizedModal = normalizeName(modalProductName);
             for (const [name, product] of Object.entries(window.__oppi_productCache)) {
                 if (normalizeName(name) === normalizedModal) {
-                    console.log('[OPPI] Producto normalizado desde modal:', product.name);
                     window.__oppi_clickedProductName = null;
                     return product;
                 }
@@ -574,7 +593,6 @@
         if (window.__oppi_clickedProductName) {
             const cached = findProductInCache(window.__oppi_clickedProductName);
             if (cached) {
-                console.log('[OPPI] Producto desde click:', cached.name);
                 window.__oppi_clickedProductName = null;
                 return cached;
             }
@@ -583,7 +601,6 @@
         // PRIORIDAD 3: Último producto capturado (si coincide)
         if (window.__oppi_lastProduct) {
             if (modalProductName && normalizeName(window.__oppi_lastProduct.name) === normalizeName(modalProductName)) {
-                console.log('[OPPI] Producto desde lastProduct:', window.__oppi_lastProduct.name);
                 return window.__oppi_lastProduct;
             }
         }
@@ -608,53 +625,6 @@
         
         return null;
     }
-
-    /*
-     * Obtener producto actual - múltiples estrategias
-     *
-    async function getProduct(modal) {
-        // Obtener nombre del modal actual
-        const modalProductName = getProductNameFromModal(modal);
-        
-        // Estrategia 1: Si tenemos un nombre clickeado, buscar por ese nombre
-        if (window.__oppi_clickedProductName) {
-            const cached = findProductInCache(window.__oppi_clickedProductName);
-            if (cached) {
-                console.log('[OPPI] Producto desde click capturado:', cached.name);
-                window.__oppi_clickedProductName = null;
-                return cached;
-            }
-        }
-        
-        // Estrategia 2: Buscar por nombre del modal en el cache
-        if (modalProductName) {
-            const cached = findProductInCache(modalProductName);
-            if (cached) {
-                console.log('[OPPI] Producto desde cache (nombre modal):', cached.name);
-                return cached;
-            }
-        }
-        
-        // Estrategia 3: Último producto capturado (solo si coincide con el modal)
-        if (window.__oppi_lastProduct) {
-            if (!modalProductName || normalizeName(window.__oppi_lastProduct.name) === normalizeName(modalProductName)) {
-                console.log('[OPPI] Producto desde __oppi_lastProduct:', window.__oppi_lastProduct.name);
-                return window.__oppi_lastProduct;
-            }
-        }
-        
-        // Estrategia 4: Datos básicos del DOM
-        if (modalProductName) {
-            console.log('[OPPI] Usando nombre del modal (sin datos adicionales):', modalProductName);
-            return { 
-                id: 0, 
-                name: modalProductName, 
-                _fromDOM: true 
-            };
-        }
-        
-        return null;
-    }*/
     
     /**
      * Manejar apertura de modal
@@ -741,7 +711,7 @@
                             const product = cursor.value;
                             if (product && product.name) {
                                 if (normalizeName(product.name) === normalizedSearch) {
-                                    console.log('[OPPI] ✅ Producto encontrado en IndexedDB:', product.name);
+                                    //console.log('[OPPI] ✅ Producto encontrado en IndexedDB:', product.name);
                                     resolve(product);
                                     return;
                                 }
@@ -852,7 +822,6 @@
                 if (cartData && cartData.items && cartData.items.length > 0) {
                     cartData.items.forEach(item => {
                         if (item && item.product) {
-                            console.log('[OPPI] Guardando en cache:', item.product.name);
                             window.__oppi_productCache[item.product.name] = item.product;
                             
                             // Si es variación, guardar también el producto padre
@@ -865,7 +834,6 @@
                     const lastItem = cartData.items[cartData.items.length - 1];
                     if (lastItem && lastItem.product) {
                         window.__oppi_lastProduct = lastItem.product;
-                        console.log('[OPPI] ✅ Cache actualizado con', cartData.items.length, 'productos');
                     }
                     
                     setTimeout(function() {
@@ -886,7 +854,7 @@
             }
             return originalSend.apply(this, arguments);
         };
-        console.log('[OPPI] XHR interceptor configurado');
+        //console.log('[OPPI] XHR interceptor configurado');
     }
     
     /**
@@ -921,7 +889,7 @@
             subtree: true
         });
         
-        console.log('[OPPI] Observer configurado');
+        //console.log('[OPPI] Observer configurado');
     }
 
     /**
@@ -1096,7 +1064,6 @@
             }
         `;
         document.head.appendChild(style);
-        console.log('[OPPI] Estilos inyectados');
     }
     
     /**
@@ -1106,7 +1073,7 @@
         if (window.__oppi_initialized) return;
         window.__oppi_initialized = true;
         
-        console.log('[OPPI] Inicializando...');
+        //console.log('[OPPI] Inicializando...');
         injectStyles();
         setupObserver();
         setupXHRInterceptor();
@@ -1117,7 +1084,7 @@
             handleModal(existingModal);
         }
         
-        console.log('[OPPI] ✅ Inicialización completada');
+        //console.log('[OPPI] ✅ Inicialización completada');
     }
     
     if (document.readyState === 'loading') {
